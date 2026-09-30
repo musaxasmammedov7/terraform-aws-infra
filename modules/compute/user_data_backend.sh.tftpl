@@ -3,6 +3,8 @@
 # Reads runtime configuration from SSM Parameter Store (via the SSM VPC
 # endpoint) and starts the application. Replace the start command with
 # the real one for your backend service.
+# например когда бд создалась он свой эндпонит юрл записывает в SSM parameters store, а бакенд уже когда запускается делает $(aws ssm get-parameter --name "/$${PROJECT}/$${ENV}/rds/host"
+
 set -euo pipefail
 exec > >(tee /var/log/user-data.log | logger -t user-data) 2>&1
 
