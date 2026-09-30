@@ -5,6 +5,23 @@
 # Depends on: network (subnet group + DB SG) and iam (queue policy roles).
 # =====================================================================
 
+#             AWS Infrastructure
+#                           │
+#        ┌──────────────────┼──────────────────┐
+#        │                  │                  │
+#       KMS                RDS                S3
+#        │                  │                  │
+#   шифрование          PostgreSQL          файлы
+#        │
+#        ├────────────── SQS ──────────────┐
+#        │              очередь            │
+#        │                                  │
+#        ├──────── Secrets Manager          │
+#        │              секреты             │
+#        │                                  │
+#        └──────── SSM Parameter Store(здесь находится конфигурация или юрл эндпоинтов чтобы не надо было прописовать user-data)     │
+#                      конфигурация  
+
 locals {
   name    = "${var.project}-${var.environment}"
   account = data.aws_caller_identity.current.account_id
