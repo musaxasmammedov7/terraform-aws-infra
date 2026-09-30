@@ -98,19 +98,19 @@ module "endpoints" {
       route_table_ids = module.vpc.private_route_table_ids
       tags            = { Name = "s3-gateway-endpoint" }
     }
-    ssm = {
+    ssm = {                                                      #«контрольная плоскость»: инстанс регистрируется в SSM, тянет параметры и команды.
       service             = "ssm"
       private_dns_enabled = true
       subnet_ids          = module.vpc.private_subnets
       tags                = { Name = "ssm-endpoint" }
     }
-    ssmmessages = {
+    ssmmessages = {                                              #сам канал сессии: по нему стримятся ввод/вывод между твоей консолью и инстансом (то, что ты видишь в Session Manager).
       service             = "ssmmessages"
       private_dns_enabled = true
       subnet_ids          = module.vpc.private_subnets
       tags                = { Name = "ssmmessages-endpoint" }
     }
-    ec2messages = {
+    ec2messages = {                                            # доставка команд агенту SSM на инстансе 
       service             = "ec2messages"
       private_dns_enabled = true
       subnet_ids          = module.vpc.private_subnets
