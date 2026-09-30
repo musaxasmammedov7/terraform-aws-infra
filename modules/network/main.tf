@@ -35,7 +35,7 @@ locals {
 }
 
 data "aws_ec2_managed_prefix_list" "cloudfront" {               # здесь берутся все айпишки cloudfront(edge nodes) 
-  name = "com.amazonaws.global.cloudfront.origin-facing"
+  name = "com.amazonaws.global.cloudfront.origin-facing"       # с помощью функций или вешаем на alb waf
 }
 
 # ---------------------------------------------------------------------
