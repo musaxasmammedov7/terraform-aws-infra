@@ -1,0 +1,23 @@
+#!/bin/bash
+# user_data for WORKER instances (background jobs, SQS-driven).
+# Workers poll the SQS queue and process long-running tasks.
+set -euo pipefail
+exec > >(tee /var/log/user-data.log | logger -t user-data) 2>&1
+
+PROJECT="${project}"
+ENV="${environment}"
+REGION="${region}"
+
+RDS_HOST=$(aws ssm get-parameter --name "/$${PROJECT}/$${ENV}/rds/host" --region "$REGION" --query Parameter.Value --output text)
+RDS_PORT=$(aws ssm get-parameter --name "/$${PROJECT}/$${ENV}/rds/port" --region "$REGION" --query Parameter.Value --output text)
+S3_BUCKET=$(aws ssm get-parameter --name "/$${PROJECT}/$${ENV}/s3/bucket" --region "$REGION" --query Parameter.Value --output text)
+SQS_URL=$(aws ssm get-parameter --name "/$${PROJECT}/$${ENV}/sqs/url" --region "$REGION" --query Parameter.Value --output text)
+SECRET_ARN=$(aws ssm get-parameter --name "/$${PROJECT}/$${ENV}/secrets/app" --region "$REGION" --query Parameter.Value --output text)
+
+export RDS_HOST RDS_PORT S3_BUCKET SQS_URL SECRET_ARN
+
+dnf update -y
+
+# ---- Replace the following with your real worker command: ----
+# cd /opt/workers && ./worker --queue "$SQS_URL"
+echo "Worker instance bootstrapped: $HOSTNAME (env=$ENV)"

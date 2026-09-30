@@ -1,0 +1,30 @@
+#!/bin/bash
+# user_data for BACKEND API instances.
+# Reads runtime configuration from SSM Parameter Store (via the SSM VPC
+# endpoint) and starts the application. Replace the start command with
+# the real one for your backend service.
+set -euo pipefail
+exec > >(tee /var/log/user-data.log | logger -t user-data) 2>&1
+
+PROJECT="${project}"
+ENV="${environment}"
+REGION="${region}"
+
+# Fetch configuration from SSM Parameter Store (non-secret values)
+RDS_HOST=$(aws ssm get-parameter --name "/$${PROJECT}/$${ENV}/rds/host" --region "$REGION" --query Parameter.Value --output text)
+RDS_PORT=$(aws ssm get-parameter --name "/$${PROJECT}/$${ENV}/rds/port" --region "$REGION" --query Parameter.Value --output text)
+S3_BUCKET=$(aws ssm get-parameter --name "/$${PROJECT}/$${ENV}/s3/bucket" --region "$REGION" --query Parameter.Value --output text)
+SQS_URL=$(aws ssm get-parameter --name "/$${PROJECT}/$${ENV}/sqs/url" --region "$REGION" --query Parameter.Value --output text)
+SECRET_ARN=$(aws ssm get-parameter --name "/$${PROJECT}/$${ENV}/secrets/app" --region "$REGION" --query Parameter.Value --output text)
+
+# Secrets (DB password etc.) are fetched at runtime by the app via
+# SecretsManager GetSecretValue - never write them to disk.
+
+export RDS_HOST RDS_PORT S3_BUCKET SQS_URL SECRET_ARN
+
+# System updates + basic packages
+dnf update -y
+
+# ---- Replace the following with your real backend start command: ----
+# cd /opt/app && ./backend-server --bind 0.0.0.0:80
+echo "Backend instance bootstrapped: $HOSTNAME (env=$ENV)"
