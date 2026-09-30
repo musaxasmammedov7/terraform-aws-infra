@@ -12,6 +12,10 @@
 #   - Route53 hosted zone (created here so ACM/CloudFront can use it later)
 # =====================================================================
 
+#alb_sg egress ──► ссылка на app_sg
+app_sg ingress ──► ссылка на alb_sg взаимные ссылки между двумя модулями. Terraform строит граф зависимостей, а модульные outputs тянут за собой весь модуль → получается цикл, который Terraform не может разрешить (при валидации ). 
+#Поэтому одно направление (alb_sg → app) сделано через CIDR приватных подсетей — так цикл разрывается, а трафик всё равно доходит, потому что app-инстансы живут ровно в этих подсетях.
+
 locals {
   name = "${var.project}-${var.environment}"
 
@@ -30,7 +34,7 @@ locals {
   }
 }
 
-data "aws_ec2_managed_prefix_list" "cloudfront" {
+data "aws_ec2_managed_prefix_list" "cloudfront" {               # здесь берутся все айпишки cloudfront(edge nodes) 
   name = "com.amazonaws.global.cloudfront.origin-facing"
 }
 
