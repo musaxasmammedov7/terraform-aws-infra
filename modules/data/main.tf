@@ -19,6 +19,9 @@ data "aws_caller_identity" "current" {}
 # KMS: one master key encrypts everything (RDS, S3, SQS, Secrets, EBS,
 # CloudTrail, Backup). The key policy explicitly grants each AWS service.
 # ---------------------------------------------------------------------
+
+#дает разрешение использовагнием мастером ключом шифрования бэк и воркер инстансу и также создает key_statemnts в котором указывает каким сервисам дать доступ
+
 module "kms" {
   source  = "terraform-aws-modules/kms/aws"
   version = "4.2.2"
