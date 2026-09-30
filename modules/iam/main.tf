@@ -8,22 +8,32 @@
 # from naming conventions), so the data layer can reference these roles.
 # =====================================================================
 
-#Здесь созданы роли для инстансов                     
+#                    IAM
 #                     │
 #        ┌────────────┼────────────┐
-#       │            │            │
-#     Backend      Workers      Frontend
+#        │            │            │
+#     Backend       Workers      Frontend
 #        │            │            │
 #        ▼            ▼            ▼
-#      IAM Role     IAM Role     IAM Role
+#    IAM Role      IAM Role      IAM Role
 #        │            │            │
-#   ┌────┼────┐    ┌──┼───┐       │
-#   │    │    │    │  │   │       │
-#  S3   SQS  KMS  SQS S3 KMS      S3
-#   │         │       │     │       │
-#   └────┐    │       └──┐  │       │
-#        ▼    ▼          ▼  ▼       ▼
-#      Secrets Manager
+#   ┌────┼────┬───┐ ┌─┼────┬────┐  │
+#   │    │    │   │ │ │    │    │  │
+#  S3   SQS  KMS Secrets SQS  S3  S3
+#             │   │         │
+#             └───┼─────────┘
+#                 │
+#                 ▼
+#          Secrets Manager
+
+#Backend:
+#S3 + SQS + KMS + Secrets Manager + SSM
+
+#Workers:
+#SQS + S3 + KMS + Secrets Manager + SSM
+
+#Frontend:
+#S3 + SSM
 
 locals {
   name    = "${var.project}-${var.environment}"
