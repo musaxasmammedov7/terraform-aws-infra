@@ -8,6 +8,23 @@
 # from naming conventions), so the data layer can reference these roles.
 # =====================================================================
 
+#Здесь созданы роли для инстансов                     
+#                     │
+#        ┌────────────┼────────────┐
+#       │            │            │
+#     Backend      Workers      Frontend
+#        │            │            │
+#        ▼            ▼            ▼
+#      IAM Role     IAM Role     IAM Role
+#        │            │            │
+#   ┌────┼────┐    ┌──┼───┐       │
+#   │    │    │    │  │   │       │
+#  S3   SQS  KMS  SQS S3 KMS      S3
+#   │         │       │     │       │
+#   └────┐    │       └──┐  │       │
+#        ▼    ▼          ▼  ▼       ▼
+#      Secrets Manager
+
 locals {
   name    = "${var.project}-${var.environment}"
   account = data.aws_caller_identity.current.account_id
