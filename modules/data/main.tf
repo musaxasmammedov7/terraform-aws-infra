@@ -102,6 +102,9 @@ module "kms" {
 # ---------------------------------------------------------------------
 # RDS PostgreSQL, Multi-AZ, in the private database subnets (local-only RT)
 # ---------------------------------------------------------------------
+
+#создание бд также пароль автоматом создается и отпарвялется в secret manager
+
 module "db" {
   source  = "terraform-aws-modules/rds/aws"
   version = "7.2.2"
@@ -161,6 +164,9 @@ module "db" {
 # S3 bucket for user files - PRIVATE, no public access.
 # Access only via IAM roles and presigned URLs issued by the backend.
 # ---------------------------------------------------------------------
+
+#
+
 module "files_bucket" {
   source  = "terraform-aws-modules/s3-bucket/aws"
   version = "5.16.1"
