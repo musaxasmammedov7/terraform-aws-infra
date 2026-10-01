@@ -52,3 +52,8 @@ output "alb_logs_bucket" {
   description = "Name of the ALB access logs bucket"
   value       = module.alb_logs_bucket.s3_bucket_id
 }
+
+output "access_logs_bucket" {
+  description = "Name of the S3 server-access-log target bucket"
+  value       = module.access_logs_bucket.s3_bucket_id
+}

@@ -215,6 +215,12 @@ module "files_bucket" {
   attach_deny_insecure_transport_policy = true
   attach_require_latest_tls_policy      = true
 
+  # FSBP S3.9 - server access logging to the dedicated target bucket
+  logging = {
+    target_bucket = module.access_logs_bucket.s3_bucket_id
+    target_prefix = "files/"
+  }
+
   lifecycle_rule = [
     {
       id      = "expire-noncurrent-versions"
@@ -259,9 +265,66 @@ module "alb_logs_bucket" {
   # Allow the ALB/NLB service to write access logs
   attach_lb_log_delivery_policy = true
 
+  # FSBP S3.9 - server access logging to the dedicated target bucket
+  logging = {
+    target_bucket = module.access_logs_bucket.s3_bucket_id
+    target_prefix = "alb-logs/"
+  }
+
   lifecycle_rule = [
     {
       id      = "expire-logs"
+      enabled = true
+      expiration = {
+        days = 30
+      }
+    }
+  ]
+
+  tags = var.tags
+}
+
+# ---------------------------------------------------------------------
+# S3 bucket - target for server access logging (FSBP S3.9).
+# Source buckets write their access logs here; this bucket itself does
+# not log (that would recurse). Source ARNs are built by convention to
+# avoid a Terraform dependency cycle (bucket <-> log target).
+# ---------------------------------------------------------------------
+module "access_logs_bucket" {
+  source  = "terraform-aws-modules/s3-bucket/aws"
+  version = "5.16.1"
+
+  bucket = "${var.project}-${var.environment}-access-logs"
+
+  control_object_ownership = true
+  object_ownership         = "BucketOwnerEnforced"
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+
+  server_side_encryption_configuration = {
+    rule = {
+      apply_server_side_encryption_by_default = {
+        sse_algorithm     = "aws:kms"
+        kms_master_key_id = module.kms.key_arn
+      }
+      bucket_key_enabled = true
+    }
+  }
+
+  # Allow the source buckets to deliver server access logs here
+  attach_access_log_delivery_policy = true
+  access_log_delivery_policy_source_buckets = [
+    "arn:aws:s3:::${var.project}-${var.environment}-files",
+    "arn:aws:s3:::${var.project}-${var.environment}-alb-logs",
+    "arn:aws:s3:::${var.project}-${var.environment}-cloudtrail",
+  ]
+
+  lifecycle_rule = [
+    {
+      id      = "expire-access-logs"
       enabled = true
       expiration = {
         days = 30

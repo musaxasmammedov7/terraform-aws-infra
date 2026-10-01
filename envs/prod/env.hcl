@@ -42,6 +42,9 @@ locals {
   backup_retention_period = 14
   backup_retention_days   = 30
 
+  # -- Security --------------------------------------------------------
+  security_email = "musaxasmammedov77@gmail.com" # уведомления Security Hub
+
   # -- Tags ------------------------------------------------------------
   tags = {
     Environment = "prod"

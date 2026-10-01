@@ -27,10 +27,11 @@ infra/
 │   │   ├── 30-iam/               # EC2 roles + instance profiles (SSM-first)
 │   │   ├── 20-data/              # KMS, RDS, S3, SQS, Secrets, SSM
 │   │   ├── 40-compute/           # ACM, ALB, 3x ASG, CloudWatch alarms
-│   │   └── 50-edge/              # WAF, CloudFront, Route53, CloudTrail, Backup
+│   │   ├── 50-edge/              # WAF, CloudFront, Route53, CloudTrail, Backup
+│   │   └── 60-security/          # AWS Config, Security Hub, SNS alerts
 │   └── prod/   env.hcl           # same layers, production values
 └── modules/                      # thin root modules wrapping community modules
-    ├── bootstrap/ network/ iam/ data/ compute/ edge/
+    ├── bootstrap/ network/ iam/ data/ compute/ edge/ security/
 ```
 
 Each layer is an independent Terragrunt unit with its own remote state in
@@ -81,11 +82,15 @@ terragrunt run-all validate
 | compute   | `terraform-aws-modules/acm/aws`, `.../alb/aws`, `.../autoscaling/aws` | 6.3.1, 10.5.1, 9.3.2 |
 | compute   | `terraform-aws-modules/cloudwatch/aws//modules/metric-alarm` | 5.7.3 |
 | edge      | `terraform-aws-modules/wafv2/aws`, `.../cloudfront/aws`, `.../route53/aws` | 2.1.0, 6.7.1, 6.5.1 |
+| security | `terraform-aws-modules/s3-bucket/aws` (Config bucket), `.../iam/aws//modules/iam-role` (Config role) | 5.16.1, 6.8.2 |
+| security | `terraform-aws-modules/sns/aws`, `.../eventbridge/aws` (notifications) | 7.1.1, 4.3.2 |
 
-Two components have **no** community module from `terraform-aws-modules`
-(CloudTrail, AWS Backup) and use a small amount of raw AWS resources inside
-the `edge` layer. Shield Standard is enabled automatically for CloudFront
-and needs no configuration.
+Three components have **no** community module from `terraform-aws-modules`
+(AWS Config, Security Hub, and CloudTrail/AWS Backup) and use raw AWS
+resources - inside the `security` (Config, Security Hub) and `edge`
+(CloudTrail, Backup) layers. SNS + EventBridge alerts are built from the
+Babenko modules. Shield Standard is enabled automatically for CloudFront and
+needs no configuration.
 
 ## Security highlights
 
@@ -99,6 +104,9 @@ and needs no configuration.
 - S3 bucket fully private - access only via IAM roles and presigned URLs.
 - WAF (managed rule groups + rate limiting), HTTPS-only CloudFront, TLS1.2+.
 - CloudTrail (multi-region, encrypted, log-file validation) and AWS Backup.
+- AWS Config (continuous recording) + Security Hub (FSBP + CIS standards),
+  IAM password policy, S3 server access logging, and Security Hub -> EventBridge
+  -> SNS email alerts for CRITICAL/HIGH findings.
 - Terraform state encrypted, versioned, HTTPS-only, locked with DynamoDB.
 
 ## Placeholders to replace before deploying

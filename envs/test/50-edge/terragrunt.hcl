@@ -24,7 +24,8 @@ dependency "network" {
 dependency "data" {
   config_path = "../20-data"
   mock_outputs = {
-    kms_key_arn = "arn:aws:kms:us-east-1:000000000000:key/mock"
+    kms_key_arn        = "arn:aws:kms:us-east-1:000000000000:key/mock"
+    access_logs_bucket = "mock-access-logs"
   }
 }
 
@@ -48,4 +49,5 @@ inputs = {
   acm_certificate_arn   = dependency.compute.outputs.acm_certificate_arn
   account_id            = get_aws_account_id()
   backup_retention_days = local.env.backup_retention_days
+  access_logs_bucket    = dependency.data.outputs.access_logs_bucket
 }

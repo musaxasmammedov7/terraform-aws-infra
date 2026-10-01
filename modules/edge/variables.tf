@@ -43,6 +43,11 @@ variable "account_id" {
   type        = string
 }
 
+variable "access_logs_bucket" {
+  description = "Name of the S3 server-access-log target bucket (from the data layer)"
+  type        = string
+}
+
 variable "backup_retention_days" {
   description = "Number of days to keep AWS Backup recovery points"
   type        = number

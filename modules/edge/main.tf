@@ -216,6 +216,12 @@ module "cloudtrail_bucket" {
   attach_deny_insecure_transport_policy = true
   attach_require_latest_tls_policy      = true
 
+  # FSBP S3.9 - server access logging to the target bucket from data layer
+  logging = {
+    target_bucket = var.access_logs_bucket
+    target_prefix = "cloudtrail/"
+  }
+
   # CloudTrail must be allowed to write
   attach_policy = true
   policy = jsonencode({
