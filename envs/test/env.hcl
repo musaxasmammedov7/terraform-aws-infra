@@ -21,8 +21,10 @@ locals {
   database_subnets = ["10.0.21.0/24", "10.0.22.0/24"]
 
   # -- Domain ----------------------------------------------------------
-  # REPLACE with a domain you control (Route53 can host any zone).
-  domain = "app-test.example.com"
+  # Empty = domain-less mode: CloudFront uses its default *.cloudfront.net
+  # certificate (HTTPS still works), ALB talks HTTP to CloudFront.
+  # Set a real domain here when you own one (ACM + Route53 will kick in).
+  domain = ""
 
   # -- Compute (EC2) ---------------------------------------------------
   frontend_instance_type = "t3.micro"
@@ -46,11 +48,15 @@ locals {
   db_name                 = "myapp"
   db_username             = "myapp"
   db_port                 = 5432
-  backup_retention_period = 7
+  backup_retention_period = 1
+  multi_az              = false
   backup_retention_days   = 14
 
-  # -- Security --------------------------------------------------------
-  security_email = "musaxasmammedov77@gmail.com" # уведомления Security Hub
+# -- Security --------------------------------------------------------
+  security_email = "musaxasmammedov77@gmail.com"   # уведомления Security Hub
+  # This AWS account cannot enable Security Hub (SubscriptionRequiredException).
+  # Config/password policy/SNS still deploy; flip to true on a real account.
+  enable_security_hub = false
 
   # -- Tags ------------------------------------------------------------
   tags = {

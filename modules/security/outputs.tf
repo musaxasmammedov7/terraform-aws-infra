@@ -9,8 +9,8 @@ output "config_bucket" {
 }
 
 output "securityhub_arn" {
-  description = "ARN of the Security Hub account"
-  value       = aws_securityhub_account.this.id
+  description = "ARN of the Security Hub account (empty when disabled)"
+  value       = try(aws_securityhub_account.this[0].id, "")
 }
 
 output "sns_topic_arn" {

@@ -47,4 +47,5 @@ inputs = {
   db_username             = local.env.db_username
   db_port                 = local.env.db_port
   backup_retention_period = local.env.backup_retention_period
+  multi_az              = local.env.multi_az
 }

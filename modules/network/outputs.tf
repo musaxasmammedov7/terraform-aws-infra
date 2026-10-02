@@ -49,8 +49,8 @@ output "igw_id" {
 }
 
 output "zone_id" {
-  description = "The ID of the Route53 hosted zone"
-  value       = module.route53_zone.id
+  description = "The ID of the Route53 hosted zone (empty without a custom domain)"
+  value       = try(module.route53_zone[0].id, "")
 }
 
 output "alb_sg_id" {

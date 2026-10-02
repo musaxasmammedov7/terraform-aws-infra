@@ -40,10 +40,12 @@ locals {
   db_username             = "myapp"
   db_port                 = 5432
   backup_retention_period = 14
+  multi_az              = true
   backup_retention_days   = 30
 
-  # -- Security --------------------------------------------------------
-  security_email = "musaxasmammedov77@gmail.com" # уведомления Security Hub
+# -- Security --------------------------------------------------------
+  security_email = "musaxasmammedov77@gmail.com"   # уведомления Security Hub
+  enable_security_hub = true
 
   # -- Tags ------------------------------------------------------------
   tags = {

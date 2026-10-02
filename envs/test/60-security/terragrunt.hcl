@@ -27,4 +27,5 @@ inputs = {
   tags        = local.env.tags
   kms_key_arn = dependency.data.outputs.kms_key_arn
   email       = local.env.security_email
+  enable_security_hub = local.env.enable_security_hub
 }

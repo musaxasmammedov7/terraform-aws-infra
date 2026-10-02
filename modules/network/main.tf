@@ -13,29 +13,28 @@
 # =====================================================================
 
 #alb_sg egress ──► ссылка на app_sg
-app_sg ingress ──► ссылка на alb_sg взаимные ссылки между двумя модулями. Terraform строит граф зависимостей, а модульные outputs тянут за собой весь модуль → получается цикл, который Terraform не может разрешить (при валидации ). 
+#app_sg ingress ──► ссылка на alb_sg взаимные ссылки между двумя модулями. Terraform строит граф зависимостей, а модульные outputs тянут за собой весь модуль → получается цикл, который Terraform не может разрешить (при валидации ). 
 #Поэтому одно направление (alb_sg → app) сделано через CIDR приватных подсетей — так цикл разрывается, а трафик всё равно доходит, потому что app-инстансы живут ровно в этих подсетях.
 
 locals {
   name = "${var.project}-${var.environment}"
 
-  # ALB egress targets the app subnets by CIDR instead of by SG reference.
-  # This avoids a mutual SG-to-SG dependency (alb_sg <-> app_sg) which
-  # Terraform cannot resolve across modules.
+  # ALB egress targets the app subnets by CIDR instead of by SG reference
+  # (avoids a mutual SG-to-SG cycle). Kept as a single rule over the VPC CIDR
+  # to stay within the (reduced) per-ENI rule quota of this account.
   alb_egress_to_app = {
-    for i, cidr in var.private_subnets :
-    "to-app-${i}" => {
+    to-app = {
       from_port   = 80
       to_port     = 443
       ip_protocol = "tcp"
-      cidr_ipv4   = cidr
-      description = "Egress to app subnet ${cidr}"
+      cidr_ipv4   = module.vpc.vpc_cidr_block
+      description = "Egress to app instances within the VPC"
     }
   }
 }
 
-data "aws_ec2_managed_prefix_list" "cloudfront" {               # здесь берутся все айпишки cloudfront(edge nodes) 
-  name = "com.amazonaws.global.cloudfront.origin-facing"       # с помощью функций или вешаем на alb waf
+data "aws_ec2_managed_prefix_list" "cloudfront" {        # здесь берутся все айпишки cloudfront(edge nodes) 
+  name = "com.amazonaws.global.cloudfront.origin-facing" # с помощью функций или вешаем на alb waf
 }
 
 # ---------------------------------------------------------------------
@@ -92,26 +91,35 @@ module "endpoints" {
   vpc_id             = module.vpc.vpc_id
   security_group_ids = [module.endpoints_sg.id]
 
+  # Provide region + explicit service_endpoint so the module skips the
+  # aws_vpc_endpoint_service lookup (which returns multiple matches for s3
+  # in us-east-1: gateway + interface variants).
+  region = var.region
+
   endpoints = {
     s3 = {
-      service_type    = "Gateway"
-      route_table_ids = module.vpc.private_route_table_ids
-      tags            = { Name = "s3-gateway-endpoint" }
+      service_type     = "Gateway"
+      service_endpoint = "com.amazonaws.${var.region}.s3"
+      route_table_ids  = module.vpc.private_route_table_ids
+      tags             = { Name = "s3-gateway-endpoint" }
     }
-    ssm = {                                                      #«контрольная плоскость»: инстанс регистрируется в SSM, тянет параметры и команды.
+    ssm = { #«контрольная плоскость»: инстанс регистрируется в SSM, тянет параметры и команды.
       service             = "ssm"
+      service_endpoint    = "com.amazonaws.${var.region}.ssm"
       private_dns_enabled = true
       subnet_ids          = module.vpc.private_subnets
       tags                = { Name = "ssm-endpoint" }
     }
-    ssmmessages = {                                              #сам канал сессии: по нему стримятся ввод/вывод между твоей консолью и инстансом (то, что ты видишь в Session Manager).
+    ssmmessages = { #сам канал сессии: по нему стримятся ввод/вывод между твоей консолью и инстансом (то, что ты видишь в Session Manager).
       service             = "ssmmessages"
+      service_endpoint    = "com.amazonaws.${var.region}.ssmmessages"
       private_dns_enabled = true
       subnet_ids          = module.vpc.private_subnets
       tags                = { Name = "ssmmessages-endpoint" }
     }
-    ec2messages = {                                            # доставка команд агенту SSM на инстансе 
+    ec2messages = { # доставка команд агенту SSM на инстансе 
       service             = "ec2messages"
+      service_endpoint    = "com.amazonaws.${var.region}.ec2messages"
       private_dns_enabled = true
       subnet_ids          = module.vpc.private_subnets
       tags                = { Name = "ec2messages-endpoint" }
@@ -167,13 +175,17 @@ module "alb_sg" {
   description = "Security group for the internet-facing ALB"
   vpc_id      = module.vpc.vpc_id
 
+  # Avoid the aws_vpc_security_group_rules_exclusive guard (it conflicts
+  # when rules are added incrementally and can hit rule limits)
+  enable_exclusive_rules = false
+
   ingress_rules = {
-    https-from-cloudfront = {
-      from_port      = 443
+    http-https-from-cloudfront = {
+      from_port      = 80
       to_port        = 443
       ip_protocol    = "tcp"
       prefix_list_id = data.aws_ec2_managed_prefix_list.cloudfront.id
-      description    = "HTTPS from CloudFront"
+      description    = "HTTP/HTTPS from CloudFront"
     }
   }
   egress_rules = local.alb_egress_to_app
@@ -292,6 +304,9 @@ module "db_sg" {
 module "route53_zone" {
   source  = "terraform-aws-modules/route53/aws"
   version = "6.5.1"
+
+  # Only needed for a custom domain; without one there is nothing to host.
+  count = var.domain != "" ? 1 : 0
 
   create_zone = true
   name        = var.domain

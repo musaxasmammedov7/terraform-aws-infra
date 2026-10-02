@@ -9,6 +9,73 @@
 
 locals {
   name = "${var.project}-${var.environment}"
+
+  # With a real domain: HTTPS listener + HTTP->HTTPS redirect.
+  # Without a domain (domain == ""): plain HTTP listener - CloudFront
+  # serves HTTPS on its own default certificate instead.
+  https_listener = var.domain != "" ? {
+    https = {
+      port            = 443
+      protocol        = "HTTPS"
+      certificate_arn = module.acm[0].acm_certificate_arn
+      ssl_policy      = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+
+      forward = {
+        target_group_key = "frontend"
+      }
+
+      rules = {
+        api = {
+          priority = 10
+          actions = [
+            { forward = { target_group_key = "backend" } }
+          ]
+          conditions = [
+            { path_pattern = { values = ["/api/*"] } }
+          ]
+        }
+      }
+    }
+  } : {}
+
+  http_redirect_listener = var.domain != "" ? {
+    http-redirect = {
+      port     = 80
+      protocol = "HTTP"
+      redirect = {
+        port        = "443"
+        protocol    = "HTTPS"
+        status_code = "HTTP_301"
+      }
+    }
+  } : {}
+
+  http_forward_listener = var.domain != "" ? {} : {
+    http = {
+      port     = 80
+      protocol = "HTTP"
+
+      forward = {
+        target_group_key = "frontend"
+      }
+
+      rules = {
+        api = {
+          priority = 10
+          actions = [
+            { forward = { target_group_key = "backend" } }
+          ]
+          conditions = [
+            { path_pattern = { values = ["/api/*"] } }
+          ]
+        }
+      }
+    }
+  }
+
+  http_listener = merge(local.http_redirect_listener, local.http_forward_listener)
+
+  alb_listeners = merge(local.http_listener, local.https_listener)
 }
 
 data "aws_ami" "amazon_linux_2023" {
@@ -39,6 +106,10 @@ module "acm" {
   source  = "terraform-aws-modules/acm/aws"
   version = "6.3.1"
 
+  # ACM is only needed for a custom domain; without one CloudFront uses its
+  # default certificate.
+  count = var.domain != "" ? 1 : 0
+
   domain_name               = var.domain
   zone_id                   = var.zone_id
   subject_alternative_names = ["*.${var.domain}"]
@@ -68,53 +139,12 @@ module "alb" {
   idle_timeout               = 60
   enable_http2               = true
 
-  access_logs = {
-    bucket  = var.alb_logs_bucket
-    prefix  = "${local.name}/alb"
-    enabled = true
-  }
+  # NOTE: ALB access logs are disabled - the -alb-logs bucket's delivery
+  # policy requires an x-amz-acl header that conflicts with
+  # BucketOwnerEnforced. Server access logging on the bucket itself already
+  # covers FSBP S3.9.
 
-  listeners = {
-    http-redirect = {
-      port     = 80
-      protocol = "HTTP"
-      redirect = {
-        port        = "443"
-        protocol    = "HTTPS"
-        status_code = "HTTP_301"
-      }
-    }
-    https = {
-      port            = 443
-      protocol        = "HTTPS"
-      certificate_arn = module.acm.acm_certificate_arn
-      ssl_policy      = "ELBSecurityPolicy-TLS13-1-2-2021-06"
-
-      forward = {
-        target_group_key = "frontend"
-      }
-
-      rules = {
-        api = {
-          priority = 10
-          actions = [
-            {
-              forward = {
-                target_group_key = "backend"
-              }
-            }
-          ]
-          conditions = [
-            {
-              path_pattern = {
-                values = ["/api/*"]
-              }
-            }
-          ]
-        }
-      }
-    }
-  }
+  listeners = local.alb_listeners
 
   target_groups = {
     frontend = {
@@ -123,6 +153,9 @@ module "alb" {
       port        = 80
       target_type = "instance"
       vpc_id      = var.vpc_id
+
+      # ASGs attach themselves via traffic_source_attachments
+      create_attachment = false
 
       health_check = {
         enabled             = true
@@ -141,6 +174,9 @@ module "alb" {
       port        = 80
       target_type = "instance"
       vpc_id      = var.vpc_id
+
+      # ASGs attach themselves via traffic_source_attachments
+      create_attachment = false
 
       health_check = {
         enabled             = true
@@ -198,7 +234,6 @@ module "asg_frontend" {
       ebs = {
         delete_on_termination = true
         encrypted             = true
-        kms_key_id            = var.kms_key_arn
         volume_size           = 20
         volume_type           = "gp3"
       }
@@ -280,7 +315,6 @@ module "asg_backend" {
       ebs = {
         delete_on_termination = true
         encrypted             = true
-        kms_key_id            = var.kms_key_arn
         volume_size           = 20
         volume_type           = "gp3"
       }
@@ -363,7 +397,6 @@ module "asg_workers" {
       ebs = {
         delete_on_termination = true
         encrypted             = true
-        kms_key_id            = var.kms_key_arn
         volume_size           = 20
         volume_type           = "gp3"
       }

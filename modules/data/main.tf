@@ -90,10 +90,9 @@ module "kms" {
     {
       sid        = "AllowCloudTrail"
       effect     = "Allow"
-      actions    = ["kms:GenerateDataKey", "kms:Decrypt", "kms:DescribeKey", "kms:ReEncryptFrom"]
+      actions    = ["kms:GenerateDataKey", "kms:Decrypt", "kms:DescribeKey", "kms:ReEncryptFrom", "kms:ReEncryptTo", "kms:Encrypt"]
       resources  = ["*"]
       principals = [{ type = "Service", identifiers = ["cloudtrail.amazonaws.com"] }]
-      condition  = [{ test = "StringEquals", variable = "aws:SourceAccount", values = [local.account] }]
     },
     {
       sid        = "AllowEBS"
@@ -101,6 +100,14 @@ module "kms" {
       actions    = ["kms:Encrypt", "kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey", "kms:CreateGrant"]
       resources  = ["*"]
       principals = [{ type = "Service", identifiers = ["ec2.amazonaws.com"] }]
+      condition  = [{ test = "StringEquals", variable = "aws:SourceAccount", values = [local.account] }]
+    },
+    {
+      sid        = "AllowELB"
+      effect     = "Allow"
+      actions    = ["kms:Encrypt", "kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey", "kms:CreateGrant"]
+      resources  = ["*"]
+      principals = [{ type = "Service", identifiers = ["elasticloadbalancing.amazonaws.com"] }]
       condition  = [{ test = "StringEquals", variable = "aws:SourceAccount", values = [local.account] }]
     },
     {
@@ -153,7 +160,7 @@ module "db" {
   db_subnet_group_name   = var.db_subnet_group_name
   vpc_security_group_ids = [var.db_sg_id]
 
-  multi_az = true
+  multi_az = var.multi_az
 
   backup_retention_period = var.backup_retention_period
   backup_window           = "03:00-04:00"

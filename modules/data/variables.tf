@@ -68,3 +68,9 @@ variable "backup_retention_period" {
   type        = number
   default     = 7
 }
+
+variable "multi_az" {
+  description = "Enable Multi-AZ for RDS. NOTE: AWS Free Tier does not support Multi-AZ."
+  type        = bool
+  default     = true
+}

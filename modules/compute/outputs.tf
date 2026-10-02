@@ -1,6 +1,6 @@
 output "acm_certificate_arn" {
-  description = "ARN of the ACM certificate (used by CloudFront)"
-  value       = module.acm.acm_certificate_arn
+  description = "ARN of the ACM certificate (used by CloudFront); empty without a custom domain"
+  value       = try(module.acm[0].acm_certificate_arn, "")
 }
 
 output "alb_dns_name" {

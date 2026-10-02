@@ -53,6 +53,28 @@ module "config_bucket" {
   attach_deny_insecure_transport_policy = true
   attach_require_latest_tls_policy      = true
 
+  # AWS Config must be allowed to write snapshots/history
+  attach_policy = true
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "AWSConfigAclCheck"
+        Effect    = "Allow"
+        Principal = { Service = "config.amazonaws.com" }
+        Action    = "s3:GetBucketAcl"
+        Resource  = "arn:aws:s3:::${var.project}-${var.environment}-config"
+      },
+      {
+        Sid       = "AWSConfigWrite"
+        Effect    = "Allow"
+        Principal = { Service = "config.amazonaws.com" }
+        Action    = "s3:PutObject"
+        Resource  = "arn:aws:s3:::${var.project}-${var.environment}-config/config/*"
+      }
+    ]
+  })
+
   lifecycle_rule = [
     {
       id      = "expire-config-snapshots"
@@ -124,16 +146,20 @@ resource "aws_config_configuration_recorder_status" "this" {
 # Security Hub + standards
 # ---------------------------------------------------------------------
 resource "aws_securityhub_account" "this" {
+  count = var.enable_security_hub ? 1 : 0
+
   # Don't auto-enable the default standards - we subscribe explicitly below
   enable_default_standards = false
 }
 
 resource "aws_securityhub_standards_subscription" "fsbp" {
+  count         = var.enable_security_hub ? 1 : 0
   standards_arn = "arn:aws:securityhub:${var.region}::standards/aws-foundational-security-best-practices/v/1.0.0"
   depends_on    = [aws_securityhub_account.this]
 }
 
 resource "aws_securityhub_standards_subscription" "cis" {
+  count         = var.enable_security_hub ? 1 : 0
   standards_arn = "arn:aws:securityhub:::ruleset/cis-aws-foundations-benchmark/v/1.2.0"
   depends_on    = [aws_securityhub_account.this]
 }

@@ -111,7 +111,11 @@ needs no configuration.
 
 ## Placeholders to replace before deploying
 
-1. `domain` in `envs/<env>/env.hcl` - point at a domain you control.
+1. `domain` in `envs/<env>/env.hcl` - empty (`""`) means **domain-less mode**:
+   CloudFront uses its default `*.cloudfront.net` certificate (HTTPS still
+   works), the ALB talks plain HTTP to CloudFront, and ACM/Route53 records
+   are skipped. Set a real domain (and delegate it to Route53) to get the
+   full ACM + custom-domain path.
 2. Resource sizes (`t3.micro`, `db.t3.micro`, etc.) - scale for your workload.
 3. `user_data_*.sh.tftpl` in `modules/compute/` - real application start commands.
 4. `account_id` is resolved automatically via `get_aws_account_id()`.

@@ -95,7 +95,7 @@ module "cloudfront" {
   version = "6.7.1"
 
   comment         = "${local.name} distribution"
-  aliases         = [var.domain]
+  aliases         = var.domain != "" ? [var.domain] : null
   enabled         = true
   is_ipv6_enabled = true
   http_version    = "http2and3"
@@ -105,9 +105,10 @@ module "cloudfront" {
     alb = {
       domain_name = var.alb_dns_name
       custom_origin_config = {
-        http_port              = 80
-        https_port             = 443
-        origin_protocol_policy = "https-only"
+        http_port  = 80
+        https_port = 443
+        # Without a custom domain the ALB has no cert -> talk HTTP only
+        origin_protocol_policy = var.domain != "" ? "https-only" : "http-only"
         origin_ssl_protocols   = ["TLSv1.2"]
       }
     }
@@ -116,7 +117,7 @@ module "cloudfront" {
   default_cache_behavior = {
     target_origin_id       = "alb"
     viewer_protocol_policy = "redirect-to-https"
-    cache_policy_id        = "658f4d7b-373d-44b6-a92f-f7b5f01fc97e" # Managed-CachingOptimized
+    cache_policy_id        = "658327ea-f89d-4fab-a63d-7e88639e58f6" # Managed-CachingOptimized
     compress               = true
   }
 
@@ -125,16 +126,19 @@ module "cloudfront" {
       path_pattern           = "/api/*"
       target_origin_id       = "alb"
       viewer_protocol_policy = "redirect-to-https"
-      cache_policy_id        = "4135ea2d-6df8-44a3-9df3-4b5a84be39a5" # Managed-CachingDisabled (forwards all)
+      cache_policy_id        = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # Managed-CachingDisabled (forwards all)
       allowed_methods        = ["GET", "HEAD", "OPTIONS", "PUT", "PATCH", "POST", "DELETE"]
       cached_methods         = ["GET", "HEAD"]
     }
   ]
 
-  viewer_certificate = {
+  viewer_certificate = var.domain != "" ? {
     acm_certificate_arn      = var.acm_certificate_arn
     ssl_support_method       = "sni-only"
     minimum_protocol_version = "TLSv1.2_2021"
+    } : {
+    # No custom domain: CloudFront serves HTTPS on its own *.cloudfront.net
+    cloudfront_default_certificate = true
   }
 
   # WAF (associated below to avoid the WAF<->CloudFront circular ref)
@@ -143,11 +147,9 @@ module "cloudfront" {
   tags = var.tags
 }
 
-# Associate the Web ACL with the distribution
-resource "aws_wafv2_web_acl_association" "cloudfront" {
-  resource_arn = module.cloudfront.cloudfront_distribution_arn
-  web_acl_arn  = module.waf.web_acl_arn
-}
+# The Web ACL is attached to the distribution via the cloudfront module's
+# `web_acl_id` input (see module.cloudfront above) - no separate
+# association resource is needed.
 
 # ---------------------------------------------------------------------
 # Route53 records: point the domain (and www) at CloudFront
@@ -155,6 +157,9 @@ resource "aws_wafv2_web_acl_association" "cloudfront" {
 module "route53_records" {
   source  = "terraform-aws-modules/route53/aws"
   version = "6.5.1"
+
+  # Only when a custom domain is configured
+  count = var.domain != "" ? 1 : 0
 
   create_zone = false
   name        = var.domain
@@ -213,8 +218,8 @@ module "cloudtrail_bucket" {
     }
   }
 
-  attach_deny_insecure_transport_policy = true
-  attach_require_latest_tls_policy      = true
+  attach_deny_insecure_transport_policy = false
+  attach_require_latest_tls_policy      = false
 
   # FSBP S3.9 - server access logging to the target bucket from data layer
   logging = {
@@ -265,7 +270,6 @@ module "cloudtrail_bucket" {
 resource "aws_cloudtrail" "this" {
   name                          = "${local.name}-trail"
   s3_bucket_name                = module.cloudtrail_bucket.s3_bucket_id
-  s3_key_prefix                 = "prefix"
   include_global_service_events = true
   is_multi_region_trail         = true
   enable_log_file_validation    = true

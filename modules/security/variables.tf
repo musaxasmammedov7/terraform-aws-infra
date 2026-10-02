@@ -28,3 +28,9 @@ variable "email" {
   description = "Email address for Security Hub notifications (SNS subscription)"
   type        = string
 }
+
+variable "enable_security_hub" {
+  description = "Enable AWS Security Hub + standards. Some AWS accounts (sandbox/training) cannot enable it (SubscriptionRequiredException)."
+  type        = bool
+  default     = true
+}

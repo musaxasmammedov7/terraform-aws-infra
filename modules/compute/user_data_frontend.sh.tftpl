@@ -1,18 +1,33 @@
 #!/bin/bash
 # user_data for FRONTEND instances.
-# Reads runtime configuration from SSM Parameter Store and starts the app.
-set -euo pipefail
+# Starts a minimal HTTP server on port 80 so ALB health checks pass and the
+# ALB/CloudFront URL returns a response. Replace the server with your real
+# application later - the config values are already available via SSM.
+set -uo pipefail
 exec > >(tee /var/log/user-data.log | logger -t user-data) 2>&1
 
 PROJECT="${project}"
 ENV="${environment}"
 REGION="${region}"
 
-S3_BUCKET=$(aws ssm get-parameter --name "/$${PROJECT}/$${ENV}/s3/bucket" --region "$REGION" --query Parameter.Value --output text)
+# Read runtime config from SSM Parameter Store (non-secret values).
+# Wrapped so a transient SSM failure never blocks the HTTP server below.
+S3_BUCKET=$(aws ssm get-parameter --name "/$${PROJECT}/$${ENV}/s3/bucket" --region "$REGION" --query Parameter.Value --output text 2>/dev/null || true)
 export S3_BUCKET
 
-dnf update -y
+# Minimal HTTP 200 server (replace with your real frontend server)
+python3 - <<'PY' &
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
-# ---- Replace the following with your real frontend start command: ----
-# cd /opt/frontend && ./frontend-server --bind 0.0.0.0:80
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b'OK from frontend (' + self.path.encode() + b')')
+    def log_message(self, *args):
+        pass
+
+HTTPServer(('0.0.0.0', 80), Handler).serve_forever()
+PY
+
 echo "Frontend instance bootstrapped: $HOSTNAME (env=$ENV)"
